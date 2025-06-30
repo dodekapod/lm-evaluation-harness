@@ -102,6 +102,8 @@ class RagondinAPI(TemplateAPI):
                 sorted(out["choices"], key=itemgetter("index")), ctxlens
             ):
                 pgen = RagondinAPI.find_generation_start(tokens[idx], choice['prompt_logprobs'], ctxlen)
+                assert ctxlen >= 0
+                assert pgen >= ctxlen
 
                 logprobs = sum(choice["logprobs"]["token_logprobs"][pgen:-1])
                 tokens_logprobs = choice["logprobs"]["token_logprobs"][pgen:-1]
