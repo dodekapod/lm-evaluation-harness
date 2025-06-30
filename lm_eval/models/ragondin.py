@@ -62,6 +62,31 @@ class RagondinAPI(TemplateAPI):
             }
 
     @staticmethod
+    def find_generation_start(input, output, ctxlen):
+        pos_gen = len(output) - 1
+        pos_input = len(input) - 1
+        while True:
+            pgen = pos_gen
+            pinp = pos_input
+            while pgen >= 0 and pinp >= 0:
+                t = output[pgen]
+                if 0 == pgen and t is None:
+                    pgen -= 1
+                    pinp -= 1
+                    break
+                if str(input[pinp]) not in t:
+                    pos_gen -= 1
+                    break
+                pgen -= 1
+                pinp -= 1
+            if pinp < ctxlen:
+                pgen += 1
+                pinp += 1
+                break
+
+        return pgen + ctxlen
+
+    @staticmethod
     def parse_logprobs(
         outputs: Union[Dict, List[Dict]],
         tokens: List[List[int]] = None,
@@ -71,19 +96,23 @@ class RagondinAPI(TemplateAPI):
         res = []
         if not isinstance(outputs, list):
             outputs = [outputs]
+        idx = 0
         for out in outputs:
-            for choice, _ in zip(
+            for choice, ctxlen in zip(
                 sorted(out["choices"], key=itemgetter("index")), ctxlens
             ):
-                logprobs = sum(choice["logprobs"]["token_logprobs"][-2:-1])
-                tokens_logprobs = choice["logprobs"]["token_logprobs"][-2:-1]
-                top_logprobs = choice["logprobs"]["top_logprobs"][-2:-1]
+                pgen = RagondinAPI.find_generation_start(tokens[idx], choice['prompt_logprobs'], ctxlen)
+
+                logprobs = sum(choice["logprobs"]["token_logprobs"][pgen:-1])
+                tokens_logprobs = choice["logprobs"]["token_logprobs"][pgen:-1]
+                top_logprobs = choice["logprobs"]["top_logprobs"][pgen:-1]
                 is_greedy = True
                 for tok, top in zip(tokens_logprobs, top_logprobs):
                     if tok != max(top.values()):
                         is_greedy = False
                         break
                 res.append((logprobs, is_greedy))
+            idx += 1
         return res
 
     @staticmethod
